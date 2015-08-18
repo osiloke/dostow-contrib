@@ -2,10 +2,12 @@ package store
 
 import (
 	"errors"
+	"net/url"
+
 	"github.com/franela/goreq"
 	"github.com/mgutz/logxi/v1"
+	"github.com/mitchellh/mapstructure"
 	. "github.com/osiloke/gostore"
-	"net/url"
 )
 
 var logger = log.New("gostore.dostow")
@@ -13,6 +15,12 @@ var logger = log.New("gostore.dostow")
 type ServerError struct {
 	code int
 	msg  string
+}
+
+type DataList struct {
+	TotalCount int           `json:"total_count"`
+	Count      int           `json:"count"`
+	Data       []interface{} `json:"data"`
 }
 
 func (e ServerError) Error() string {
@@ -24,35 +32,7 @@ func newServerError(code int, msg string) ServerError {
 }
 
 type DostowRows struct {
-}
-
-func handleError(err error) error {
-	if e, ok := err.(*url.Error); ok {
-		//e.Err == *net.OpError
-		if serr, ok := err.(*goreq.Error); ok {
-			if serr.Timeout() {
-				return newServerError(500, "Server timeout")
-			}
-			return newServerError(500, err.Error())
-		}
-		if e.Err.Error() == "no such host" {
-			return newServerError(500, "Server Unreachable")
-		}
-		return newServerError(500, "Server Unreachable")
-	}
-	return newServerError(500, "Unable to complete action")
-}
-
-func handleResponse(res *goreq.Response, dst interface{}) error {
-	switch res.StatusCode {
-	case 200:
-		res.Body.FromJsonTo(&dst)
-		return nil
-	case 500, 400, 401:
-		return newServerError(res.StatusCode, "Unable to perform action due to server error")
-	default:
-	}
-	return errors.New("Cannot perfrom action")
+	data []interface{}
 }
 
 func (s DostowRows) Next(dst interface{}) (bool, error) {
@@ -158,7 +138,6 @@ func (s Dostow) Save(store string, src interface{}) (key string, err error) {
 	req.Body = src
 	res, err := req.Do()
 	if err != nil {
-		log.Error("Error:", "data", src, "err", err)
 		return "", handleError(err)
 	}
 	if res.Body != nil {
@@ -195,18 +174,56 @@ func (s Dostow) GetByField(name, val, store string, dst interface{}) (err error)
 	return errors.New("not implemented")
 }
 
+//FIlterGet gets one item from a store based on some filter
 func (s Dostow) FilterGet(filter map[string]interface{}, store string, dst interface{}) (err error) {
 	req := s.get(store)
-	req.QueryString = filter
+	item := url.Values{}
+	if filter != nil {
+		for k, v := range filter {
+			item.Set(k, v.(string))
+		}
+	}
+	item.Set("size", "1")
+	req.QueryString = item
 	res, err := req.Do()
 	if err != nil {
+		logger.Error("Filter Get Error:", "err", err)
 		return handleError(err)
 	}
-	return handleResponse(res, dst)
+
+	var dl DataList
+	err = handleResponse(res, &dl)
+	if err == nil {
+		if dl.Count == 1 {
+			err = mapstructure.Decode(dl.Data[0].(map[string]interface{}), dst)
+		}
+	}
+	logger.Debug("Err", "data", dl.Data, "err", err)
+	return
 }
 
 func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string) (rrows ObjectRows, err error) {
-	return nil, errors.New("not implemented")
+	req := s.get(store)
+	item := url.Values{}
+	if filter != nil {
+		for k, v := range filter {
+			item.Set(k, v.(string))
+		}
+	}
+	if count > -1 {
+		item.Set("size", string(count))
+	}
+	req.QueryString = item
+	res, err := req.Do()
+	if err != nil {
+		return nil, handleError(err)
+	}
+	var dst []interface{}
+	err = handleResponse(res, dst)
+	if err != nil {
+		return DostowRows{dst}, err
+	}
+	return nil, errors.New("Not found")
 }
 
 func (s Dostow) FilterDelete(filter map[string]interface{}, store string) (err error) {
@@ -223,6 +240,34 @@ func (s Dostow) GetByFieldsByField(name, val, store string, fields []string, dst
 
 func (s Dostow) Close() {
 
+}
+func handleError(err error) error {
+	if e, ok := err.(*url.Error); ok {
+		//e.Err == *net.OpError
+		if serr, ok := err.(*goreq.Error); ok {
+			if serr.Timeout() {
+				return newServerError(500, "Server timeout")
+			}
+			return newServerError(500, err.Error())
+		}
+		if e.Err.Error() == "no such host" {
+			return newServerError(500, "Server Unreachable")
+		}
+		return newServerError(500, "Server Unreachable")
+	}
+	logger.Error("Error", "err", err)
+	return newServerError(500, "Unable to complete action")
+}
+
+func handleResponse(res *goreq.Response, dst interface{}) error {
+	switch res.StatusCode {
+	case 200:
+		return res.Body.FromJsonTo(dst)
+	case 500, 400, 401:
+		return newServerError(res.StatusCode, "Unable to perform action due to server error")
+	default:
+	}
+	return errors.New("Cannot perfrom action")
 }
 
 func NewStore(apiUrl, accessKey string) Dostow {
