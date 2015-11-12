@@ -1,21 +1,36 @@
 package store
 
 import (
-	"bytes"
+	// "bytes"
 	"encoding/json"
 	"errors"
+	"github.com/beefsack/go-rate"
+	"github.com/gosexy/to"
 	"github.com/mgutz/logxi/v1"
 	"github.com/mitchellh/mapstructure"
 	. "github.com/osiloke/gostore"
-	"github.com/parnurzeal/gorequest"
+	"strings"
+	// "github.com/smallnest/goreq"
+	"github.com/ddliu/go-httpclient"
+	//https://github.com/sethgrid/pester //use pester with go-httpclient
 	"io"
+	"io/ioutil"
 	"mime/multipart"
-	// "net/http"
+	"net/http"
 	"net/url"
+	"time"
 	// "os"
 	"path/filepath"
 )
 
+// TODO: add github.com/cenkalti/backoff
+const (
+	USERAGENT       = "Dostow Store API"
+	TIMEOUT         = 30
+	CONNECT_TIMEOUT = 5
+)
+
+var rl = rate.New(1, time.Second)
 var logger = log.New("gostore.dostow")
 
 type ServerError struct {
@@ -57,12 +72,17 @@ func (s DostowRows) Close() {
 }
 
 type Dostow struct {
-	url   string
-	key   string
-	req   *gorequest.SuperAgent
-	debug bool
+	url    string
+	key    string
+	client *http.Client
+	debug  bool
 }
 
+func (s Dostow) Options() map[string]interface{} {
+	return map[string]interface{}{
+		"url": s.url,
+	}
+}
 func (s Dostow) CreateDatabase() (err error) {
 	return errors.New("not implemented")
 }
@@ -92,15 +112,15 @@ func (s Dostow) Before(id string, count int, skip int, store string) (rows Objec
 	return nil, errors.New("not implemented")
 }
 
-func (s Dostow) FilterBefore(id string, filter map[string]interface{}, count int, skip int, store string) (rows ObjectRows, err error) {
+func (s Dostow) FilterBefore(id string, filter map[string]interface{}, count int, skip int, store string, opts ObjectStoreOptions) (rows ObjectRows, err error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s Dostow) FilterBeforeCount(id string, filter map[string]interface{}, count int, skip int, store string) (int64, error) {
+func (s Dostow) FilterBeforeCount(id string, filter map[string]interface{}, count int, skip int, store string, opts ObjectStoreOptions) (int64, error) {
 	return 0, errors.New("not implemented")
 }
 
-func (s Dostow) FilterSince(id string, filter map[string]interface{}, count int, skip int, store string) (rows ObjectRows, err error) {
+func (s Dostow) FilterSince(id string, filter map[string]interface{}, count int, skip int, store string, opts ObjectStoreOptions) (rows ObjectRows, err error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -110,6 +130,34 @@ func (s Dostow) Since(id string, count, skip int, store string) (rrows ObjectRow
 	return nil, errors.New("not implemented")
 }
 
+func (s *Dostow) post(url string, data string) (*httpclient.Response, error) {
+	// Post with files should be sent as multipart.
+	headers := make(map[string]string)
+	headers["X-DOSTOW-GROUP-ACCESS-KEY"] = s.key
+	headers["Content-Type"] = "application/json"
+	body := strings.NewReader(data)
+	// httpclient.NewHttpClient(defaults)
+	rl.Wait()
+	return httpclient.Begin().Do("POST", url, headers, body)
+}
+
+func (s *Dostow) get(url string, params map[string]string) (*httpclient.Response, error) {
+	// Post with files should be sent as multipart.
+	rl.Wait()
+	return httpclient.Begin().WithHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).Get(url, params)
+}
+
+func (s *Dostow) put(url string, data string) (*httpclient.Response, error) {
+	// Post with files should be sent as multipart.
+	headers := make(map[string]string)
+	headers["X-DOSTOW-GROUP-ACCESS-KEY"] = s.key
+	headers["Content-Type"] = "application/json"
+	body := strings.NewReader(data)
+
+	rl.Wait()
+	return httpclient.Begin().Do("PUT", url, headers, body)
+}
+
 func (s Dostow) Get(id, store string, dst interface{}) (err error) {
 	return errors.New("not implemented")
 }
@@ -117,14 +165,21 @@ func (s Dostow) Get(id, store string, dst interface{}) (err error) {
 func (s Dostow) Save(store string, src interface{}) (key string, err error) {
 	var msg map[string]interface{}
 	srcjson, _ := json.Marshal(src)
-	logger.Debug("Sending data", "data", string(srcjson))
-	resp, bodyBytes, errs := s.req.Post(s.url+"/store/"+store).
-		Set("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
-		SendString(string(srcjson)).
-		EndBytes()
-	if errs != nil {
-		return "", errs[0]
+	// logger.Debug("Sending data", "data", string(srcjson))
+	resp, err := s.post(s.url+"/store/"+store, string(srcjson))
+	// if resp != nil && resp.Body != nil {
+	// 	defer resp.Body.Close()
+	// }
+	// resp, bodyBytes, errs := goreq.New().Post(s.url+"/store/"+store).
+	// 	SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
+	// 	ContentType("json").SendMapString(string(srcjson)).
+	// 	SetClient(s.client).
+	// 	EndBytes()
+	if err != nil {
+		return "", err
 	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	switch resp.StatusCode {
 	case 200:
 		if err := json.Unmarshal(bodyBytes, &msg); err == nil {
@@ -145,14 +200,21 @@ func (s Dostow) Update(id string, store string, src interface{}) (err error) {
 	var msg map[string]interface{}
 	srcjson, _ := json.Marshal(src)
 	url := s.url + "/store/" + store + "/" + id
-	logger.Debug("Updating data", "url", url, "data", string(srcjson))
-	resp, bodyBytes, errs := s.req.Put(url).
-		Set("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
-		SendString(string(srcjson)).
-		EndBytes()
-	if errs != nil {
+	// logger.Debug("Updating data", "url", url, "data", string(srcjson))
+	resp, err := s.put(url, string(srcjson))
+	// if resp != nil && resp.Body != nil {
+	// 	defer resp.Body.Close()
+	// }
+	// resp, bodyBytes, errs := goreq.New().Put(url).
+	// 	SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
+	// 	ContentType("json").SendMapString(string(srcjson)).
+	// 	SetClient(s.client).
+	// 	EndBytes()
+	if err != nil {
 		return handleError(err)
 	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	switch resp.StatusCode {
 	case 200:
 		if err := json.Unmarshal(bodyBytes, &msg); err == nil {
@@ -182,20 +244,31 @@ func (s Dostow) GetByField(name, val, store string, dst interface{}) (err error)
 }
 
 //FIlterGet gets one item from a store based on some filter
-func (s Dostow) FilterGet(filter map[string]interface{}, store string, dst interface{}) (err error) {
+func (s Dostow) FilterGet(filter map[string]interface{}, store string, dst interface{}, opts ObjectStoreOptions) (err error) {
 	if filter == nil {
 		filter = map[string]interface{}{}
 	}
-	request := s.req.Get(s.url+"/store/"+store).Set("X-DOSTOW-GROUP-ACCESS-KEY", s.key)
+	// request := goreq.New().Get(s.url+"/store/"+store).SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).SetClient(s.client)
+	params := map[string]string{"size": "1"}
 	for k, v := range filter {
-		request.QueryData.Add(k, v.(string))
+		// request.QueryData.Add(k, v.(string))
+		params[k] = v.(string)
 	}
-	request.QueryData.Add("size", "1")
-	resp, bodyBytes, errs := request.EndBytes()
-	if errs != nil {
+	// request.QueryData.Add("size", "1")
+	// resp, bodyBytes, errs := request.EndBytes()
+
+	resp, err := s.get(s.url+"/store/"+store, params)
+	// if resp != nil {
+	// 	if resp.Body != nil {
+	// 		defer resp.Body.Close()
+	// 	}
+	// }
+	if err != nil {
 		// logger.Warn("Filter Get Error:")
-		return errors.New("An unknown error occured")
+		return err
 	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
 
 	var dl DataList
 	switch resp.StatusCode {
@@ -220,21 +293,31 @@ func (s Dostow) FilterGet(filter map[string]interface{}, store string, dst inter
 	return
 }
 
-func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string) (rrows ObjectRows, err error) {
-	if filter == nil {
-		filter = map[string]interface{}{}
+func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string, opts ObjectStoreOptions) (rrows ObjectRows, err error) {
+	params := map[string]string{}
+	for k, v := range filter {
+		params[k] = to.String(v)
 	}
 	if count > -1 {
 		filter["size"] = string(count)
 	}
-	resp, bodyBytes, errs := s.req.Get(s.url+"/store/"+store).
-		Set("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
-		Query(filter).
-		EndBytes()
-	if errs != nil {
-		logger.Error("Filter GetAll Error:", "err", errs)
+	// resp, bodyBytes, errs := goreq.New().Get(s.url+"/store/"+store).
+	// 	SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
+	// 	Query(filter).
+	// 	SetClient(s.client).
+	// 	EndBytes()
+
+	resp, err := s.get(s.url+"/store/"+store, params)
+	// if resp != nil && resp.Body != nil {
+	// 	defer resp.Body.Close()
+	// }
+
+	if err != nil {
+		logger.Error("Filter GetAll Error:", "err", err)
 		return nil, handleError(err)
 	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	var dst []interface{}
 	switch resp.StatusCode {
 	case 200:
@@ -250,7 +333,7 @@ func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int,
 	return nil, errors.New("Not found")
 }
 
-func (s Dostow) FilterDelete(filter map[string]interface{}, store string) (err error) {
+func (s Dostow) FilterDelete(filter map[string]interface{}, store string, opts ObjectStoreOptions) (err error) {
 	return errors.New("not implemented")
 }
 
@@ -258,7 +341,7 @@ func (s Dostow) FilterUpdate(filter map[string]interface{}, src interface{}, sto
 	return errors.New("Not Implemented")
 }
 
-func (s Dostow) FilterCount(filter map[string]interface{}, store string) (int64, error) {
+func (s Dostow) FilterCount(filter map[string]interface{}, store string, opts ObjectStoreOptions) (int64, error) {
 	return 0, errors.New("not implemented")
 }
 
@@ -288,39 +371,40 @@ func streamingUploadFile(id, field, path, store string, w *io.PipeWriter, file i
 	}
 }
 
-func (s Dostow) UploadFile(id, field, path, store string, file io.Reader) (interface{}, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
-	if err != nil {
-		return nil, err
-	}
-	_, err = io.Copy(part, file)
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-	resp, bodyBytes, errs := s.req.Post(s.url+"/upload/"+store+"/"+id+"/"+field).
-		Set("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
-		EndBytes()
-	if errs != nil {
-		logger.Error("Upload Error:", "err", errs)
-		return nil, handleError(err)
-	}
-	var dst interface{}
-	switch resp.StatusCode {
-	case 200:
-		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
-			return nil, err
-		}
-		return dst, err
-	case 500, 400, 401:
-		return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
-	default:
-		return nil, errors.New("Cannot perfrom action")
-	}
-	// return
-}
+// func (s Dostow) UploadFile(id, field, path, store string, file io.Reader) (interface{}, error) {
+// 	body := &bytes.Buffer{}
+// 	writer := multipart.NewWriter(body)
+// 	part, err := writer.CreateFormFile("file", filepath.Base(path))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	_, err = io.Copy(part, file)
+// 	err = writer.Close()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	resp, bodyBytes, errs := goreq.New().Post(s.url+"/upload/"+store+"/"+id+"/"+field).
+// 		SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
+// 		SetClient(s.client).
+// 		EndBytes()
+// 	if errs != nil {
+// 		logger.Error("Upload Error:", "err", errs)
+// 		return nil, handleError(err)
+// 	}
+// 	var dst interface{}
+// 	switch resp.StatusCode {
+// 	case 200:
+// 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
+// 			return nil, err
+// 		}
+// 		return dst, err
+// 	case 500, 400, 401:
+// 		return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
+// 	default:
+// 		return nil, errors.New("Cannot perfrom action")
+// 	}
+// 	// return
+// }
 
 func (s Dostow) Close() {
 
@@ -340,6 +424,12 @@ func handleError(err error) error {
 }
 
 func NewStore(apiUrl, accessKey string) Dostow {
-	s := Dostow{url: apiUrl, key: accessKey, debug: true, req: gorequest.New()}
+	httpclient.Defaults(httpclient.Map{
+		"opt_useragent":   USERAGENT,
+		"opt_timeout":     TIMEOUT,
+		"Accept-Encoding": "gzip,deflate,sdch",
+	})
+
+	s := Dostow{url: apiUrl, key: accessKey, debug: true, client: nil}
 	return s
 }
