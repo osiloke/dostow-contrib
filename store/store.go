@@ -30,7 +30,7 @@ const (
 	CONNECT_TIMEOUT = 5
 )
 
-var rl = rate.New(1, time.Second)
+var rl = rate.New(50, time.Second)
 var logger = log.New("gostore.dostow")
 
 type ServerError struct {
@@ -231,6 +231,41 @@ func (s Dostow) Update(id string, store string, src interface{}) (err error) {
 	}
 }
 
+func (s Dostow) Replace(id string, store string, src interface{}) (err error) {
+	var msg map[string]interface{}
+	srcjson, _ := json.Marshal(src)
+	url := s.url + "/store/" + store + "/" + id
+	// logger.Debug("Updating data", "url", url, "data", string(srcjson))
+	resp, err := s.put(url, string(srcjson))
+	// if resp != nil && resp.Body != nil {
+	// 	defer resp.Body.Close()
+	// }
+	// resp, bodyBytes, errs := goreq.New().Put(url).
+	// 	SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
+	// 	ContentType("json").SendMapString(string(srcjson)).
+	// 	SetClient(s.client).
+	// 	EndBytes()
+	if err != nil {
+		return handleError(err)
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	switch resp.StatusCode {
+	case 200:
+		if err := json.Unmarshal(bodyBytes, &msg); err == nil {
+			return nil
+		} else {
+			return err
+		}
+	case 404:
+		return newServerError(resp.StatusCode, string(bodyBytes))
+	case 500, 400, 401:
+		return newServerError(resp.StatusCode, string(bodyBytes))
+	default:
+		return errors.New("Cannot perform action")
+	}
+}
+
 func (s Dostow) Delete(id string, store string) (err error) {
 	return errors.New("not implemented")
 }
@@ -337,7 +372,11 @@ func (s Dostow) FilterDelete(filter map[string]interface{}, store string, opts O
 	return errors.New("not implemented")
 }
 
-func (s Dostow) FilterUpdate(filter map[string]interface{}, src interface{}, store string) (err error) {
+func (s Dostow) FilterUpdate(filter map[string]interface{}, src interface{}, store string, opts ObjectStoreOptions) (err error) {
+	return errors.New("Not Implemented")
+}
+
+func (s Dostow) FilterReplace(filter map[string]interface{}, src interface{}, store string, opts ObjectStoreOptions) (err error) {
 	return errors.New("Not Implemented")
 }
 
