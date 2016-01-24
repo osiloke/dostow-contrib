@@ -63,6 +63,9 @@ type DostowRows struct {
 	data []interface{}
 }
 
+func (s DostowRows) LastError() error {
+	return nil
+}
 func (s DostowRows) Next(dst interface{}) (bool, error) {
 
 	return false, nil
