@@ -530,7 +530,6 @@ func (s Dostow) PasswordReset(email string) (ret map[string]interface{}, err err
 		}
 	} else {
 		var errData map[string]interface{}
-		logger.Warn(string(bodyBytes))
 		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
 			if msg, ok := errData["msg"].(string); ok {
 				return nil, newServerError(resp.StatusCode, msg)
