@@ -483,9 +483,10 @@ type RegisterForm struct {
 	Password  []byte `json:"Password,omitempty"`
 	Password2 []byte `json:"Password2,omitempty"`
 }
+type LoginRegister func(email, username, password string) (map[string]interface{}, error)
 
 func (s Dostow) Register(email, username, password string) (user map[string]interface{}, err error) {
-	data, err := json.Marshal(&RegisterForm{Email: email, Username: username, Password: []byte(password), Password2: []byte(password)})
+	data, err := json.Marshal(&RegisterForm{Email: email, Username: username, Password: password, Password2: password})
 	if err != nil {
 		return nil, err
 	}
@@ -510,6 +511,38 @@ func (s Dostow) Register(email, username, password string) (user map[string]inte
 					return nil, newServerError(400, errData["msg"].(string))
 				}
 			}
+		}
+	}
+	return nil, handleErrorResponse(resp.StatusCode, bodyBytes)
+}
+func (s Dostow) Login(email, username, password string) (user map[string]interface{}, err error) {
+	form := `{`
+	if username != "" {
+		form = form + `"username":"` + username + `"`
+	} else if email != "" {
+		form = form + `"email":"` + email + `"`
+	}
+	form = form + `,"password":"` + password + `"}`
+	resp, err := s.post(s.url+"/auth/sign_in", form)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode == 200 {
+		if err = json.Unmarshal(bodyBytes, &user); err == nil {
+			return
+		} else {
+			return nil, err
+		}
+	} else {
+		var errData map[string]interface{}
+		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
+			if msg, ok := errData["msg"].(string); ok {
+				return nil, newServerError(resp.StatusCode, msg)
+			}
+		} else {
+			return nil, newServerError(resp.StatusCode, err.Error())
 		}
 	}
 	return nil, handleErrorResponse(resp.StatusCode, bodyBytes)
