@@ -2,6 +2,7 @@ package store
 
 import (
 	// "bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"github.com/beefsack/go-rate"
@@ -9,6 +10,7 @@ import (
 	"github.com/mgutz/logxi/v1"
 	"github.com/mitchellh/mapstructure"
 	"github.com/osiloke/gostore"
+	"strconv"
 	"strings"
 	// "github.com/smallnest/goreq"
 	"github.com/ddliu/go-httpclient"
@@ -103,7 +105,7 @@ func (s Dostow) CreateTable(store string, sample interface{}) (err error) {
 }
 
 func (s Dostow) All(count int, skip int, store string) (rrows gostore.ObjectRows, err error) {
-	return nil, errors.New("not implemented")
+	return s.FilterGetAll(nil, count, skip, store, nil)
 }
 
 func (s Dostow) AllCursor(store string) (gostore.ObjectRows, error) {
@@ -164,10 +166,13 @@ func (s Dostow) Get(id, store string, dst interface{}) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-
+	var bodyBytes []byte
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
 			return err
 		}
@@ -207,9 +212,13 @@ func (s Dostow) Save(store string, src interface{}) (key string, err error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &msg); err == nil {
 			return msg["id"].(string), nil
 		} else {
@@ -242,9 +251,13 @@ func (s Dostow) Update(id string, store string, src interface{}) (err error) {
 		return handleError(err)
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &msg); err == nil {
 			return nil
 		} else {
@@ -277,8 +290,12 @@ func (s Dostow) Replace(id string, store string, src interface{}) (err error) {
 		return handleError(err)
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &msg); err == nil {
 			return nil
 		} else {
@@ -327,18 +344,35 @@ func (s Dostow) FilterGet(filter map[string]interface{}, store string, dst inter
 		return err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 
 	var dl DataList
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &dl); err != nil {
 			return err
 		}
-	case 500, 400, 401:
-		return newServerError(resp.StatusCode, "Unable to perform action due to server error")
+	case 500, 400, 401, 404:
+		var errData map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
+		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
+			if msg, ok := errData["msg"].(string); ok {
+				return newServerError(resp.StatusCode, msg)
+			} else {
+				return newServerError(resp.StatusCode, string(bodyBytes))
+			}
+		} else {
+			return newServerError(resp.StatusCode, err.Error())
+		}
 	default:
-		return errors.New("Cannot perfrom action")
+		return errors.New("Cannot performm action")
 	}
 	if dl.Count >= 1 {
 
@@ -362,7 +396,7 @@ func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int,
 		params[k] = to.String(v)
 	}
 	if count > -1 {
-		filter["size"] = string(count)
+		params["size"] = strconv.Itoa(count)
 	}
 	// resp, bodyBytes, errs := goreq.New().Get(s.url+"/store/"+store).
 	// 	SetHeader("X-DOSTOW-GROUP-ACCESS-KEY", s.key).
@@ -374,22 +408,32 @@ func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int,
 	// if resp != nil && resp.Body != nil {
 	// 	defer resp.Body.Close()
 	// }
-
 	if err != nil {
 		logger.Error("Filter GetAll Error:", "err", err)
 		return nil, handleError(err)
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	var dst map[string]interface{}
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
 			return nil, err
 		}
 		return DostowRows{dst}, err
 	case 500, 400, 401:
-		return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
+		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
+			return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
+		}
+		return nil, newServerError(resp.StatusCode, dst["msg"].(string))
 	default:
 		return nil, errors.New("Cannot perfrom action")
 	}
@@ -480,8 +524,8 @@ func streamingUploadFile(id, field, path, store string, w *io.PipeWriter, file i
 type RegisterForm struct {
 	Username  string `json:"Username,omitempty"`
 	Email     string `json:"Email,omitempty"`
-	Password  []byte `json:"Password,omitempty"`
-	Password2 []byte `json:"Password2,omitempty"`
+	Password  string `json:"Password,omitempty"`
+	Password2 string `json:"Password2,omitempty"`
 }
 type LoginRegister func(email, username, password string) (map[string]interface{}, error)
 
@@ -496,13 +540,21 @@ func (s Dostow) Register(email, username, password string) (user map[string]inte
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		err = json.Unmarshal(bodyBytes, &user)
 		return
 	} else {
 		logger.Warn("error while registring", "code", resp.StatusCode, "body", string(bodyBytes))
 		var errData map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &errData); err == nil {
 			if msg, ok := errData["msg"].(string); ok {
 				if msg == "auth: User already exists" {
@@ -528,15 +580,20 @@ func (s Dostow) Login(email, username, password string) (user map[string]interfa
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
-		if err = json.Unmarshal(bodyBytes, &user); err == nil {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
 			return
-		} else {
-			return nil, err
 		}
+		err = json.Unmarshal(bodyBytes, &user)
+		return
 	} else {
 		var errData map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
 			if msg, ok := errData["msg"].(string); ok {
 				return nil, newServerError(resp.StatusCode, msg)
@@ -545,7 +602,7 @@ func (s Dostow) Login(email, username, password string) (user map[string]interfa
 			return nil, newServerError(resp.StatusCode, err.Error())
 		}
 	}
-	return nil, handleErrorResponse(resp.StatusCode, bodyBytes)
+	return nil, handleErrorResponse(500, bodyBytes)
 }
 func (s Dostow) PasswordReset(email string) (ret map[string]interface{}, err error) {
 	form := `{"email":"` + email + `"}`
@@ -554,8 +611,12 @@ func (s Dostow) PasswordReset(email string) (ret map[string]interface{}, err err
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &ret); err == nil {
 			return
 		} else {
@@ -563,6 +624,10 @@ func (s Dostow) PasswordReset(email string) (ret map[string]interface{}, err err
 		}
 	} else {
 		var errData map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
 			if msg, ok := errData["msg"].(string); ok {
 				return nil, newServerError(resp.StatusCode, msg)
@@ -580,8 +645,12 @@ func (s Dostow) SetPassword(token, password string) (ret map[string]interface{},
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &ret); err == nil {
 			return
 		} else {
@@ -589,6 +658,10 @@ func (s Dostow) SetPassword(token, password string) (ret map[string]interface{},
 		}
 	} else {
 		var errData map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
 			if msg, ok := errData["msg"].(string); ok {
 				return nil, newServerError(resp.StatusCode, msg)
@@ -612,8 +685,12 @@ func (s Dostow) SignIn(username, email, password string) (user map[string]interf
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &user); err == nil {
 			return
 		} else {
@@ -621,6 +698,10 @@ func (s Dostow) SignIn(username, email, password string) (user map[string]interf
 		}
 	} else {
 		var errData map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &errData); err == nil {
 			if msg, ok := errData["msg"].(string); ok {
 				return nil, newServerError(resp.StatusCode, msg)
@@ -639,12 +720,20 @@ func (s Dostow) SignOut(token string) (err error) {
 		return
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		err = json.Unmarshal(bodyBytes, &user)
 		return
 	} else {
 		var msg map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &msg); err == nil {
 			return newServerError(resp.StatusCode, msg["msg"].(string))
 		}
@@ -660,8 +749,12 @@ func (s Dostow) Me(token string) (data map[string]interface{}, err error) {
 		return
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	if resp.StatusCode == 200 {
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err := json.Unmarshal(bodyBytes, &user); err == nil {
 			return user, nil
 		} else {
@@ -669,6 +762,10 @@ func (s Dostow) Me(token string) (data map[string]interface{}, err error) {
 		}
 	} else {
 		var msg map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return
+		}
 		if err = json.Unmarshal(bodyBytes, &msg); err == nil {
 			return nil, newServerError(resp.StatusCode, msg["msg"].(string))
 		}
@@ -702,10 +799,14 @@ func (s Dostow) GetGroup(id string, token string) (*Group, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	var dst Group
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
 			return nil, err
 		}
@@ -727,10 +828,14 @@ func (s Dostow) Schemas(token, group string) (gostore.ObjectRows, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	var bodyBytes []byte
 	var dst map[string]interface{}
 	switch resp.StatusCode {
 	case 200:
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
 			return nil, err
 		}
@@ -739,6 +844,10 @@ func (s Dostow) Schemas(token, group string) (gostore.ObjectRows, error) {
 		return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
 	case 400, 401:
 		var errMsg map[string]interface{}
+		bodyBytes, err = getBytes(resp)
+		if err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(bodyBytes, &errMsg); err != nil {
 			return nil, err
 		}
@@ -778,6 +887,22 @@ func handleError(err error) error {
 	return newServerError(500, "Unable to complete action")
 }
 
+func getBytes(resp *httpclient.Response) ([]byte, error) {
+	var (
+		err    error
+		reader io.ReadCloser
+	)
+	switch resp.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		reader = resp.Body
+	}
+	return ioutil.ReadAll(reader)
+}
 func NewStore(apiUrl, accessKey string) Dostow {
 	httpclient.Defaults(httpclient.Map{
 		"opt_useragent":   USERAGENT,
