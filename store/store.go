@@ -15,6 +15,7 @@ import (
 	// "github.com/smallnest/goreq"
 	"github.com/ddliu/go-httpclient"
 	//https://github.com/sethgrid/pester //use pester with go-httpclient
+	// "fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -66,6 +67,7 @@ func newServerError(code int, msg string) ServerError {
 
 type DostowRows struct {
 	data map[string]interface{}
+	json []byte
 }
 
 func (s DostowRows) LastError() error {
@@ -75,7 +77,13 @@ func (s DostowRows) Next(dst interface{}) (bool, error) {
 
 	return false, nil
 }
+func (s DostowRows) NextRaw() ([]byte, bool) {
+
+	return nil, false
+}
 func (s DostowRows) Raw() map[string]interface{} { return s.data }
+
+func (s DostowRows) JSON() []byte { return s.json }
 
 func (s DostowRows) Close() {
 }
@@ -390,7 +398,7 @@ func (s Dostow) AllWithinRange(filter map[string]interface{}, count int, skip in
 	return nil, ErrNotImplemented
 }
 
-func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string, opts gostore.ObjectStoreOptions) (rrows gostore.ObjectRows, err error) {
+func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string, opts gostore.ObjectStoreOptions) (rrows *DostowRows, err error) {
 	params := map[string]string{}
 	for k, v := range filter {
 		params[k] = to.String(v)
@@ -424,7 +432,7 @@ func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int,
 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
 			return nil, err
 		}
-		return DostowRows{dst}, err
+		return &DostowRows{dst, bodyBytes}, err
 	case 500, 400, 401:
 		bodyBytes, err = getBytes(resp)
 		if err != nil {
@@ -818,50 +826,71 @@ func (s Dostow) GetGroup(id string, token string) (*Group, error) {
 	}
 	return nil, errors.New("Not found")
 }
-func (s Dostow) Schemas(token, group string) (gostore.ObjectRows, error) {
-	//TODO: recursively get all schemas
-	resp, err := s.getClient().
-		WithHeader("Authorization", "bearer "+token).
-		WithHeader("X-DOSTOW-GROUP", group).
-		Get(s.url+"/schemas", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	var bodyBytes []byte
-	var dst map[string]interface{}
-	switch resp.StatusCode {
-	case 200:
-		bodyBytes, err = getBytes(resp)
-		if err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
-			return nil, err
-		}
-		return DostowRows{dst}, err
-	case 500:
-		return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
-	case 400, 401:
-		var errMsg map[string]interface{}
-		bodyBytes, err = getBytes(resp)
-		if err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(bodyBytes, &errMsg); err != nil {
-			return nil, err
-		}
-		logger.Info("failed in retrieving schemas", "msg", errMsg)
-		return nil, newServerError(resp.StatusCode, errMsg["msg"].(string))
-	default:
-		return nil, errors.New("Cannot perfrom action")
-	}
-	return nil, errors.New("Not found")
-}
+
+// func (s Dostow) Schemas(token, group string) (gostore.ObjectRows, error) {
+// 	//TODO: recursively get all schemas
+// 	resp, err := s.getClient().
+// 		WithHeader("Authorization", "bearer "+token).
+// 		WithHeader("X-DOSTOW-GROUP", group).
+// 		Get(s.url+"/schemas", `{"size":100}`)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer resp.Body.Close()
+// 	var bodyBytes []byte
+// 	var dst map[string]interface{}
+// 	switch resp.StatusCode {
+// 	case 200:
+// 		bodyBytes, err = getBytes(resp)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		if err := json.Unmarshal(bodyBytes, &dst); err != nil {
+// 			return nil, err
+// 		}
+// 		return DostowRows{dst, bodyBytes}, err
+// 	case 500:
+// 		return nil, newServerError(resp.StatusCode, "Unable to perform action due to server error")
+// 	case 400, 401:
+// 		var errMsg map[string]interface{}
+// 		bodyBytes, err = getBytes(resp)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		if err := json.Unmarshal(bodyBytes, &errMsg); err != nil {
+// 			return nil, err
+// 		}
+// 		logger.Info("failed in retrieving schemas", "msg", errMsg)
+// 		return nil, newServerError(resp.StatusCode, errMsg["msg"].(string))
+// 	default:
+// 		return nil, errors.New("Cannot perfrom action")
+// 	}
+// 	return nil, errors.New("Not found")
+// }
 
 func (s Dostow) Close() {
 
 }
+
+// func handleJSONErrorResponse(resp *httpclient.Response) error {
+// 	switch resp.StatusCode {
+// 	case 404:
+// 		return newServerError(resp.StatusCode, "Unable to perform action due to server error")
+// 	case 500, 400, 401:
+// 		var errMsg map[string]interface{}
+// 		bodyBytes, err = getBytes(resp)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		if err := json.Unmarshal(bodyBytes, &errMsg); err != nil {
+// 			return err
+// 		}
+// 		logger.Info("failed in retrieving schemas", "msg", errMsg)
+// 		return newServerError(resp.StatusCode, errMsg["msg"].(string))
+// 	default:
+// 		return errors.New("Cannot perform action")
+// 	}
+// }
 
 func handleErrorResponse(code int, bodyBytes []byte) error {
 	switch code {
