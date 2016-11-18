@@ -28,14 +28,26 @@ type ResetPasswordRequest struct {
 	Password string `json:"password"`
 }
 
+type LoginSuccess struct {
+	Data struct {
+		Email     string `json:"Email"`
+		Username  string `json:"Username"`
+		CreatedAt string `json:"created_at"`
+		ID        string `json:"id"`
+		Schemas   string `json:"-"`
+	} `json:"data"`
+	Token    string `json:"token"`
+	Username string `json:"username"`
+}
+
 func newAuthService(sling *sling.Sling) *AuthService {
 	return &AuthService{
 		sling: sling.Path("auth/"),
 	}
 }
 
-func (s *AuthService) SignIn(req *SignInRequest) (*json.RawMessage, error) {
-	var result *json.RawMessage = &json.RawMessage{}
+func (s *AuthService) SignIn(req *SignInRequest) (*LoginSuccess, error) {
+	var result *LoginSuccess = &LoginSuccess{}
 	apiError := new(APIError)
 	_s := s.sling.New().Post("sign_in").BodyJSON(req)
 	_, err := _s.Receive(result, apiError)
