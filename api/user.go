@@ -46,6 +46,13 @@ func newAuthService(sling *sling.Sling) *AuthService {
 	}
 }
 
+func (s *AuthService) Me(token string, user interface{}) error {
+	apiError := new(APIError)
+	_s := s.sling.New().Get("me").Set("Authorization", "bearer "+token)
+	_, err := _s.Receive(user, apiError)
+	return relevantError(err, apiError)
+}
+
 func (s *AuthService) SignIn(req *SignInRequest) (*LoginSuccess, error) {
 	var result *LoginSuccess = &LoginSuccess{}
 	apiError := new(APIError)
