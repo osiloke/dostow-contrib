@@ -38,7 +38,12 @@ func (s *StoreService) GetRaw(store, id string) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New().Get("store/" + store + "/" + id)
-	_, err := _s.Receive(result, apiError)
+	resp, err := _s.Receive(result, apiError)
+	if resp.StatusCode == 404 {
+		apiError.Status = "404"
+		apiError.Message = "not found"
+		return nil, apiError
+	}
 	return result, relevantError(err, apiError)
 }
 func (s *StoreService) Create(store string, data interface{}) (*json.RawMessage, error) {
