@@ -46,7 +46,7 @@ func (s *StoreService) GetRaw(store, id string) (*json.RawMessage, error) {
 	}
 	return result, relevantError(err, apiError)
 }
-func (s *StoreService) Create(store string, data interface{}, opts ...Opts) (*json.RawMessage, error) {
+func (s *StoreService) Create(store string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New()
@@ -56,7 +56,7 @@ func (s *StoreService) Create(store string, data interface{}, opts ...Opts) (*js
 	_, err := _s.Post("store/"+store).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
-func (s *StoreService) Update(store, id string, data interface{}, opts ...Opts) (*json.RawMessage, error) {
+func (s *StoreService) Update(store, id string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New()
