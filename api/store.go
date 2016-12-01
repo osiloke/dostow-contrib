@@ -46,18 +46,25 @@ func (s *StoreService) GetRaw(store, id string) (*json.RawMessage, error) {
 	}
 	return result, relevantError(err, apiError)
 }
-func (s *StoreService) Create(store string, data interface{}) (*json.RawMessage, error) {
+func (s *StoreService) Create(store string, data interface{}, opts ...Opts) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
-	_s := s.sling.New().Post("store/" + store).BodyJSON(data)
-	_, err := _s.Receive(result, apiError)
+	_s := s.sling.New()
+	for opt := range opts {
+		opt(_s)
+	}
+	_, err := _s.Post("store/"+store).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
-func (s *StoreService) Update(store, id string, data interface{}) (*json.RawMessage, error) {
+func (s *StoreService) Update(store, id string, data interface{}, opts ...Opts) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
-	_s := s.sling.New().Put("store/" + store + "/" + id).BodyJSON(data)
-	_, err := _s.Receive(result, apiError)
+	_s := s.sling.New()
+	_s := s.sling.New()
+	for opt := range opts {
+		opt(_s)
+	}
+	_, err := _s.Put("store/"+store+"/"+id).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
 func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
@@ -66,4 +73,7 @@ func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
 	_s := s.sling.New().Delete("store/" + store + "/" + id)
 	_, err := _s.Receive(result, apiError)
 	return result, relevantError(err, apiError)
+}
+func (s *StoreService) Authorize(token string) func(sling *sling.Sling) {
+	return Authorize(token)
 }
