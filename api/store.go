@@ -50,7 +50,7 @@ func (s *StoreService) Create(store string, data interface{}, opts ...Opt) (*jso
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New()
-	for opt := range opts {
+	for _, opt := range opts {
 		opt(_s)
 	}
 	_, err := _s.Post("store/"+store).BodyJSON(data).Receive(result, apiError)
@@ -60,8 +60,7 @@ func (s *StoreService) Update(store, id string, data interface{}, opts ...Opt) (
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New()
-	_s := s.sling.New()
-	for opt := range opts {
+	for _, opt := range opts {
 		opt(_s)
 	}
 	_, err := _s.Put("store/"+store+"/"+id).BodyJSON(data).Receive(result, apiError)
