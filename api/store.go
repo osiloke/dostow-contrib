@@ -73,6 +73,6 @@ func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
 	_, err := _s.Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
-func (s *StoreService) Authorize(token string) func(sl *sling.Sling) {
+func (s *StoreService) Authorize(token string) func(sl *sling.Sling) *sling.Sling {
 	return Authorize(token)
 }
