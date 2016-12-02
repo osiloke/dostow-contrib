@@ -26,6 +26,10 @@ func (l *httpLogger) LogRequest(req *http.Request) {
 		req.Method,
 		req.URL.String(),
 	)
+	l.log.Printf(
+		"Headers %v",
+		req.Header,
+	)
 }
 
 func (l *httpLogger) LogResponse(req *http.Request, res *http.Response, err error, duration time.Duration) {

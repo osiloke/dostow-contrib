@@ -51,7 +51,7 @@ func (s *StoreService) Create(store string, data interface{}, opts ...Opt) (*jso
 	apiError := new(APIError)
 	_s := s.sling.New()
 	for _, opt := range opts {
-		opt(_s)
+		_s = opt(_s)
 	}
 	_, err := _s.Post("store/"+store).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
@@ -61,7 +61,7 @@ func (s *StoreService) Update(store, id string, data interface{}, opts ...Opt) (
 	apiError := new(APIError)
 	_s := s.sling.New()
 	for _, opt := range opts {
-		opt(_s)
+		_s = opt(_s)
 	}
 	_, err := _s.Put("store/"+store+"/"+id).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
@@ -73,6 +73,6 @@ func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
 	_, err := _s.Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
-func (s *StoreService) Authorize(token string) func(sling *sling.Sling) {
+func (s *StoreService) Authorize(token string) func(sl *sling.Sling) {
 	return Authorize(token)
 }

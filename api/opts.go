@@ -4,10 +4,10 @@ import (
 	"github.com/dghubble/sling"
 )
 
-type Opt func(sling *sling.Sling)
+type Opt func(s *sling.Sling) *sling.Sling
 
-func Authorize(token string) func(sling *sling.Sling) {
-	return func(sling *sling.Sling) {
-		sling.Set("Authorization", "bearer "+token)
+func Authorize(token string) func(s *sling.Sling) *sling.Sling {
+	return func(s *sling.Sling) {
+		return s.Set("Authorization", "bearer "+token)
 	}
 }
