@@ -18,14 +18,14 @@ func newStoreService(sling *sling.Sling) *StoreService {
 	}
 }
 
-func (s *StoreService) List(store string, params ...interface{}) (*json.RawMessage, *http.Response, error) {
+func (s *StoreService) List(store string, opts ...Opt) (*json.RawMessage, *http.Response, error) {
 	var rows *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
-	_s := s.sling.New().Path("store/" + store)
-	for _, params := range params {
-		_s.QueryStruct(params)
+	_s := s.sling.New()
+	for _, opt := range opts {
+		_s = opt(_s)
 	}
-	resp, err := _s.Receive(rows, apiError)
+	resp, err := _s.Path("store/"+store).Receive(rows, apiError)
 	return rows, resp, relevantError(err, apiError)
 }
 func (s *StoreService) Get(store, id string, data interface{}) error {
@@ -34,11 +34,15 @@ func (s *StoreService) Get(store, id string, data interface{}) error {
 	_, err := _s.Receive(data, apiError)
 	return relevantError(err, apiError)
 }
-func (s *StoreService) GetRaw(store, id string) (*json.RawMessage, error) {
+func (s *StoreService) GetRaw(store, id string, opts ...Opt) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
-	_s := s.sling.New().Get("store/" + store + "/" + id)
-	resp, err := _s.Receive(result, apiError)
+	_s := s.sling.New()
+	for _, opt := range opts {
+		_s = opt(_s)
+	}
+
+	resp, err := _s.Get("store/"+store+"/"+id).Receive(result, apiError)
 	if resp.StatusCode == 404 {
 		apiError.Status = "404"
 		apiError.Message = "not found"
@@ -75,4 +79,7 @@ func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
 }
 func (s *StoreService) Authorize(token string) func(sl *sling.Sling) *sling.Sling {
 	return Authorize(token)
+}
+func (s *StoreService) Query(q interface{}) func(sl *sling.Sling) *sling.Sling {
+	return Query(q)
 }
