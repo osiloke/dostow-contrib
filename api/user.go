@@ -61,7 +61,7 @@ func (s *AuthService) SignIn(req *SignInRequest) (*LoginSuccess, error) {
 	return result, relevantError(err, apiError)
 }
 
-func (s *AuthService) Register(req *RegisterRequest) (*json.RawMessage, error) {
+func (s *AuthService) Register(req interface{}) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New().Post("register").BodyJSON(req)
