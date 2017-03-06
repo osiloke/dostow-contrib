@@ -29,15 +29,9 @@ type ResetPasswordRequest struct {
 }
 
 type LoginSuccess struct {
-	Data struct {
-		Email     string `json:"Email"`
-		Username  string `json:"Username"`
-		CreatedAt string `json:"created_at"`
-		ID        string `json:"id"`
-		Schemas   string `json:"-"`
-	} `json:"data"`
-	Token    string `json:"token"`
-	Username string `json:"username"`
+	Data     map[string]interface{} `json:"data"`
+	Token    string                 `json:"token"`
+	Username string                 `json:"username"`
 }
 
 func newAuthService(sling *sling.Sling) *AuthService {
@@ -61,7 +55,7 @@ func (s *AuthService) SignIn(req *SignInRequest) (*LoginSuccess, error) {
 	return result, relevantError(err, apiError)
 }
 
-func (s *AuthService) Register(req interface{}) (*json.RawMessage, error) {
+func (s *AuthService) Register(req *RegisterRequest) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New().Post("register").BodyJSON(req)
