@@ -54,6 +54,7 @@ type Client struct {
 	Schema *SchemaService
 	Auth   *AuthService
 	Store  *StoreService
+	File   *FileService
 }
 
 // NewClient return a new Client
@@ -92,5 +93,6 @@ func NewAdminClient(apiUrl, groupId, token string, httpClients ...*http.Client) 
 		Schema: newSchemaService(base.New()),
 		Auth:   newAuthService(base.New()),
 		Store:  newStoreService(base.New()),
+		File:   newFileService(base.New()),
 	}
 }
