@@ -75,6 +75,7 @@ func NewClient(apiUrl, apiKey string, httpClients ...*http.Client) *Client {
 		Schema: newSchemaService(base.New()),
 		Auth:   newAuthService(base.New()),
 		Store:  newStoreService(base.New()),
+		File:   newFileService(base.New()),
 	}
 }
 
