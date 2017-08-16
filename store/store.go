@@ -400,7 +400,7 @@ func (s Dostow) AllWithinRange(filter map[string]interface{}, count int, skip in
 	return nil, ErrNotImplemented
 }
 
-func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string, opts gostore.ObjectStoreOptions) (rrows *gostore.ObjectRows, err error) {
+func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int, store string, opts gostore.ObjectStoreOptions) (rrows gostore.ObjectRows, err error) {
 	params := map[string]string{}
 	for k, v := range filter {
 		params[k] = to.String(v)
