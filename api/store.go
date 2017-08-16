@@ -60,6 +60,16 @@ func (s *StoreService) Create(store string, data interface{}, opts ...Opt) (*jso
 	_, err := _s.Post("store/"+store).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
+func (s *StoreService) BulkCreate(store string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
+	var result *json.RawMessage = &json.RawMessage{}
+	apiError := new(APIError)
+	_s := s.sling.New()
+	for _, opt := range opts {
+		_s = opt(_s)
+	}
+	_, err := _s.Post("store/"+store+"/bulk").BodyJSON(data).Receive(result, apiError)
+	return result, relevantError(err, apiError)
+}
 func (s *StoreService) Update(store, id string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
 	var result *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
