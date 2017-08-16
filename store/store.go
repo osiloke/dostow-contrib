@@ -316,7 +316,9 @@ func (s Dostow) Replace(id string, store string, src interface{}) (err error) {
 
 	}
 }
-
+func (s Dostow) SaveAll(store string, src ...interface{}) (keys []string, err error) {
+	return nil, ErrNotImplemented
+}
 func (s Dostow) Delete(id string, store string) (err error) {
 	return errors.New("not implemented")
 }
