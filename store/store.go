@@ -453,6 +453,10 @@ func (s Dostow) FilterGetAll(filter map[string]interface{}, count int, skip int,
 func (s Dostow) FilterDelete(filter map[string]interface{}, store string, opts gostore.ObjectStoreOptions) (err error) {
 	return errors.New("not implemented")
 }
+
+func (s Dostow) BatchUpdate(id []interface{}, data []interface{}, store string, opts gostore.ObjectStoreOptions) (err error) {
+	return ErrNotImplemented
+}
 func (s Dostow) BatchDelete(ids []interface{}, store string, opts gostore.ObjectStoreOptions) (err error) {
 	return ErrNotImplemented
 }
