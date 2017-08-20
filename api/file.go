@@ -11,6 +11,7 @@ import (
 	"github.com/dghubble/sling"
 )
 
+//FileService is the main service struct
 type FileService struct {
 	sling *sling.Sling
 }
@@ -21,9 +22,10 @@ func newFileService(sling *sling.Sling) *FileService {
 	}
 }
 
-// http://stackoverflow.com/questions/20205796/golang-post-data-using-the-content-type-multipart-form-data
+//Create uploads a file
+//http://stackoverflow.com/questions/20205796/golang-post-data-using-the-content-type-multipart-form-data
 func (s *FileService) Create(store, key, field, filename string, file io.Reader, opts ...Opt) (*http.Response, *json.RawMessage, error) {
-	var result *json.RawMessage = &json.RawMessage{}
+	var result = &json.RawMessage{}
 	apiError := new(APIError)
 	_s := s.sling.New()
 	for _, opt := range opts {
@@ -49,9 +51,13 @@ func (s *FileService) Create(store, key, field, filename string, file io.Reader,
 
 	return rsp, result, relevantError(err, apiError)
 }
+
+//Authorize option sets an authorization header
 func (s *FileService) Authorize(token string) func(sl *sling.Sling) *sling.Sling {
 	return Authorize(token)
 }
+
+//Query adds a query to a request
 func (s *FileService) Query(q interface{}) func(sl *sling.Sling) *sling.Sling {
 	return Query(q)
 }
