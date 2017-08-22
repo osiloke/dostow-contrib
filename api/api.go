@@ -3,11 +3,12 @@ package api
 import (
 	"net/http"
 
-	"github.com/dghubble/sling"
-	"github.com/ernesto-jimenez/httplogger"
 	"log"
 	"os"
 	"time"
+
+	"github.com/dghubble/sling"
+	"github.com/ernesto-jimenez/httplogger"
 )
 
 type httpLogger struct {
@@ -85,7 +86,9 @@ func NewAdminClient(apiUrl, groupId, token string, httpClients ...*http.Client) 
 	if len(httpClients) > 0 {
 		httpClient = httpClients[0]
 	} else {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{
+			Transport: httplogger.NewLoggedTransport(http.DefaultTransport, newLogger()),
+		}
 	}
 	base := sling.New().Client(httpClient).Base(apiUrl).Set("X-Dostow-Group", groupId).Set("Authorization", token)
 	return &Client{

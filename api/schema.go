@@ -33,7 +33,7 @@ func (s *SchemaService) List(params *PaginationParams) (*json.RawMessage, *http.
 }
 
 // Get schema of a store. Schemas contain settings and data structure of a store
-// GET https://api.dostow.com/v1/schemas/get_schema_id
+// GET https://dostow.com/v1/schemas/get_schema_id
 func (s *SchemaService) Get(schemaID string) (*json.RawMessage, *http.Response, error) {
 	var schema *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)
@@ -42,7 +42,7 @@ func (s *SchemaService) Get(schemaID string) (*json.RawMessage, *http.Response, 
 }
 
 // Create a new schema.
-// POST https://api.dostow.com/v1/schemas
+// POST https://dostow.com/v1/schemas
 func (o *SchemaService) Create(storeName string, objectBody interface{}) (*json.RawMessage, *http.Response, error) {
 	var schema *json.RawMessage = &json.RawMessage{}
 	apiError := new(APIError)

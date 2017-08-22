@@ -1,5 +1,18 @@
 package api
 
+//ConnectionParams used to define an api connection
+type ConnectionParams struct {
+	Url             string
+	GroupId         string
+	AuthorizedToken string
+}
+
+//Result defines a list result
+type Result struct {
+	Data  []map[string]interface{} `json:"data"`
+	Total int                      `json:"total_count"`
+}
+
 // PaginationParams ...
 type PaginationParams struct {
 	Before int `url:"before,omitempty"`
@@ -11,4 +24,8 @@ type PaginationParams struct {
 type StatusDeletion struct {
 	ID      string `json:"id"`
 	Deleted bool   `json:"deleted"`
+}
+
+type filter struct {
+	Name string `url:"name"`
 }
