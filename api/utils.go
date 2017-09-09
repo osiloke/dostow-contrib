@@ -15,6 +15,9 @@ func deleteRows(name string, client *Client) (err error) {
 	for {
 		_, _, err = client.Store.Clear(name)
 		if err != nil {
+			if err.Error() == "does not exist or already cleared" {
+				err = nil
+			}
 			break
 		}
 		size, err = client.Store.Size(name)

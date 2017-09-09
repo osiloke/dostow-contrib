@@ -8,6 +8,7 @@ import (
 	"github.com/dghubble/sling"
 )
 
+// StoreService api service for stores
 type StoreService struct {
 	sling *sling.Sling
 }
@@ -18,6 +19,7 @@ func newStoreService(sling *sling.Sling) *StoreService {
 	}
 }
 
+// List lists entries in a store
 func (s *StoreService) List(store string, opts ...Opt) (*json.RawMessage, *http.Response, error) {
 	var rows = &json.RawMessage{}
 	apiError := new(APIError)
@@ -28,12 +30,16 @@ func (s *StoreService) List(store string, opts ...Opt) (*json.RawMessage, *http.
 	resp, err := _s.Path("store/"+store).Receive(rows, apiError)
 	return rows, resp, relevantError(err, apiError)
 }
+
+// Get returns an entry in a store by id
 func (s *StoreService) Get(store, id string, data interface{}) error {
 	apiError := new(APIError)
 	_s := s.sling.New().Get("store/" + store + "/" + id)
 	_, err := _s.Receive(data, apiError)
 	return relevantError(err, apiError)
 }
+
+// GetRaw returns the raw entry
 func (s *StoreService) GetRaw(store, id string, opts ...Opt) (*json.RawMessage, error) {
 	var result = &json.RawMessage{}
 	apiError := new(APIError)
@@ -43,13 +49,17 @@ func (s *StoreService) GetRaw(store, id string, opts ...Opt) (*json.RawMessage, 
 	}
 
 	resp, err := _s.Get("store/"+store+"/"+id).Receive(result, apiError)
-	if resp.StatusCode == 404 {
-		apiError.Status = "404"
-		apiError.Message = "not found"
-		return nil, apiError
+	if err == nil {
+		if resp.StatusCode == 404 {
+			apiError.Status = "404"
+			apiError.Message = "not found"
+			return nil, apiError
+		}
 	}
 	return result, relevantError(err, apiError)
 }
+
+// Create makes a new entry
 func (s *StoreService) Create(store string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
 	var result = &json.RawMessage{}
 	apiError := new(APIError)
@@ -60,6 +70,8 @@ func (s *StoreService) Create(store string, data interface{}, opts ...Opt) (*jso
 	_, err := _s.Post("store/"+store).BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
+
+// BulkCreate creates a list of entries
 func (s *StoreService) BulkCreate(store string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
 	var result = &json.RawMessage{}
 	apiError := new(APIError)
@@ -70,6 +82,8 @@ func (s *StoreService) BulkCreate(store string, data interface{}, opts ...Opt) (
 	_, err := _s.Post("store/"+store+"/bulk").BodyJSON(data).Receive(result, apiError)
 	return result, relevantError(err, apiError)
 }
+
+// Update update an entry
 func (s *StoreService) Update(store, id string, data interface{}, opts ...Opt) (*json.RawMessage, error) {
 	var result = &json.RawMessage{}
 	apiError := new(APIError)
@@ -81,6 +95,7 @@ func (s *StoreService) Update(store, id string, data interface{}, opts ...Opt) (
 	return result, relevantError(err, apiError)
 }
 
+// Remove removes an entry from a store
 func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
 	var result = &json.RawMessage{}
 	apiError := new(APIError)
@@ -120,9 +135,12 @@ func (s *StoreService) Clear(store string) (*json.RawMessage, *http.Response, er
 	return result, rsp, relevantError(err, apiError)
 }
 
+// Authorize authorize a request
 func (s *StoreService) Authorize(token string) func(sl *sling.Sling) *sling.Sling {
 	return Authorize(token)
 }
+
+// Query query a store
 func (s *StoreService) Query(q interface{}) func(sl *sling.Sling) *sling.Sling {
 	return Query(q)
 }

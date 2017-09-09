@@ -4,6 +4,7 @@ import (
 	// "fmt"
 	// "net/http"
 	"encoding/json"
+
 	"github.com/dghubble/sling"
 )
 
@@ -12,20 +13,21 @@ type AuthService struct {
 }
 
 type SignInRequest struct {
-	Email    string `json:"email"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
+	Email    string `form:"email" json:"email"`
+	Username string `form:"username" json:"username,omitempty"`
+	Password string `form:"password" json:"password,omitempty"`
 }
 
 type RegisterRequest struct {
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	FullName string `form:"fullName" json:"fullName"`
+	Email    string `form:"email" json:"email"`
+	Username string `form:"username" json:"username"`
+	Password string `form:"password" json:"password"`
 }
 
 type ResetPasswordRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `form:"email" json:"email"`
+	Password string `form:"password" json:"password"`
 }
 
 type LoginSuccess struct {
