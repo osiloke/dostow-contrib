@@ -5,6 +5,7 @@ import (
 	// "fmt"
 	"net/http"
 
+	"github.com/Jeffail/gabs"
 	"github.com/dghubble/sling"
 )
 
@@ -29,6 +30,26 @@ func (s *StoreService) List(store string, opts ...Opt) (*json.RawMessage, *http.
 	}
 	resp, err := _s.Path("store/"+store).Receive(rows, apiError)
 	return rows, resp, relevantError(err, apiError)
+}
+
+// Search runs a search on a store
+func (s *StoreService) Search(store string, opts ...Opt) (*json.RawMessage, error) {
+	raw, resp, err := s.List(store, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == 200 {
+		r, err := gabs.ParseJSON(*raw)
+		if err == nil {
+			if data, err := r.S("data").Children(); err == nil {
+				if len(data) > 0 {
+					return raw, nil
+				}
+			}
+		}
+		return nil, &APIError{Message: "unable to retrieve", Status: "404"}
+	}
+	return nil, &APIError{Message: "not found", Status: resp.Status}
 }
 
 // Get returns an entry in a store by id
