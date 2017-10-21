@@ -13,27 +13,27 @@ type AuthService struct {
 }
 
 type SignInRequest struct {
-	Email    string `form:"email" json:"email"`
-	Username string `form:"username" json:"username,omitempty"`
-	Password string `form:"password" json:"password,omitempty"`
+	Email    string `form:"Email" json:"Email"`
+	Username string `form:"Username" json:"Username,omitempty"`
+	Password string `form:"Password" json:"Password,omitempty"`
 }
 
 type RegisterRequest struct {
 	FullName string `form:"fullName" json:"fullName"`
-	Email    string `form:"email" json:"email"`
-	Username string `form:"username" json:"username"`
-	Password string `form:"password" json:"password"`
+	Email    string `form:"Email" json:"Email"`
+	Username string `form:"Username" json:"Username"`
+	Password string `form:"Password" json:"Password"`
 }
 
 type ResetPasswordRequest struct {
-	Email    string `form:"email" json:"email"`
-	Password string `form:"password" json:"password"`
+	Email    string `form:"Email" json:"Email"`
+	Password string `form:"Password" json:"Password"`
 }
 
 type LoginSuccess struct {
 	Data     map[string]interface{} `json:"data"`
 	Token    string                 `json:"token"`
-	Username string                 `json:"username"`
+	Username string                 `json:"Username"`
 }
 
 func newAuthService(sling *sling.Sling) *AuthService {
