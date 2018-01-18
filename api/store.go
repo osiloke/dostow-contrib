@@ -45,9 +45,12 @@ func (s *StoreService) Search(store string, opts ...Opt) (*json.RawMessage, erro
 				if len(data) > 0 {
 					return raw, nil
 				}
+				return nil, &APIError{Message: "query not matched", Status: "404"}
+			} else {
+				return nil, &APIError{Message: fmt.Sprintf("invalid response - %v", err), Status: "400"}
 			}
 		}
-		return nil, &APIError{Message: "unable to retrieve", Status: "404"}
+		return nil, &APIError{Message: fmt.Sprintf("unable to retrieve - %v", err), Status: "400"}
 	}
 	return nil, &APIError{Message: "not found", Status: resp.Status}
 }

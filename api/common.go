@@ -27,5 +27,5 @@ type StatusDeletion struct {
 }
 
 type filter struct {
-	Name string `url:"name"`
+	Q string `url:"q"`
 }
