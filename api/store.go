@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	// "fmt"
+	"fmt"
 	"net/http"
 
 	"github.com/Jeffail/gabs"
