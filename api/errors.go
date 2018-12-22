@@ -7,8 +7,9 @@ import (
 
 // APIError ...
 type APIError struct {
-	Status  string `json:"code"`
-	Message string `json:"msg"`
+	Status   string      `json:"code"`
+	Message  string      `json:"msg"`
+	ErrorObj interface{} `json:"error"`
 }
 
 func (e APIError) Error() string {
