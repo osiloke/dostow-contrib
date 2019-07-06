@@ -80,6 +80,28 @@ func NewClient(apiUrl, apiKey string, httpClients ...*http.Client) *Client {
 	}
 }
 
+// NewClientWithUser return a new Client
+func NewClientWithUser(apiUrl, apiKey, apiToken string, httpClients ...*http.Client) *Client {
+	var httpClient *http.Client
+
+	if len(httpClients) > 0 {
+		httpClient = httpClients[0]
+	} else {
+		httpClient = &http.Client{
+			Transport: httplogger.NewLoggedTransport(http.DefaultTransport, newLogger()),
+		}
+	}
+
+	base := sling.New().Client(httpClient).Base(apiUrl).Set("X-Dostow-Group-Access-Key", apiKey).Set("Authorization", apiToken)
+	return &Client{
+		sling:  base,
+		Schema: newSchemaService(base.New()),
+		Auth:   newAuthService(base.New()),
+		Store:  newStoreService(base.New()),
+		File:   newFileService(base.New()),
+	}
+}
+
 func NewAdminClient(apiUrl, groupId, token string, httpClients ...*http.Client) *Client {
 	var httpClient *http.Client
 
