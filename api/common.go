@@ -15,9 +15,10 @@ type Result struct {
 
 // PaginationParams ...
 type PaginationParams struct {
-	Before int `url:"before,omitempty"`
-	After  int `url:"after,omitempty"`
-	Size   int `url:"size,omitempty"`
+	Before int   `url:"before,omitempty" json:"before,omitempty"`
+	After  int   `url:"after,omitempty" json:"after,omitempty"`
+	Size   int   `url:"size,omitempty" json:"size,omitempty"`
+	Skip   int64 `url:"skip,omitempty" json:"skip,omitempty"`
 }
 
 // StatusDeletion ...

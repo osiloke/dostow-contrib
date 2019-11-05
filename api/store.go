@@ -56,9 +56,12 @@ func (s *StoreService) Search(store string, opts ...Opt) (*json.RawMessage, erro
 }
 
 // Get returns an entry in a store by id
-func (s *StoreService) Get(store, id string, data interface{}) error {
+func (s *StoreService) Get(store, id string, data interface{}, opts ...Opt) error {
 	apiError := new(APIError)
 	_s := s.sling.New().Get("store/" + store + "/" + id)
+	for _, opt := range opts {
+		_s = opt(_s)
+	}
 	_, err := _s.Receive(data, apiError)
 	return relevantError(err, apiError)
 }
@@ -130,7 +133,8 @@ func (s *StoreService) Remove(store, id string) (*json.RawMessage, error) {
 
 //ListResult contains a query result
 type ListResult struct {
-	Total int64 `json:"total_count"`
+	Total int64         `json:"total_count"`
+	Data  []interface{} `json:"data"`
 }
 
 //Size gets the size of store
