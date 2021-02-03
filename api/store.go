@@ -41,7 +41,7 @@ func (s *StoreService) Search(store string, opts ...Opt) (*json.RawMessage, erro
 	if resp.StatusCode == 200 {
 		r, err := gabs.ParseJSON(*raw)
 		if err == nil {
-			if data, err := r.S("data").Children(); err == nil {
+			if data, _ := r.S("data").Children(); data != nil {
 				if len(data) > 0 {
 					return raw, nil
 				}
@@ -171,4 +171,9 @@ func (s *StoreService) Authorize(token string) func(sl *sling.Sling) *sling.Slin
 // Query query a store
 func (s *StoreService) Query(q interface{}) func(sl *sling.Sling) *sling.Sling {
 	return Query(q)
+}
+
+// GenericQuery query a store
+func (s *StoreService) GenericQuery(q interface{}) func(sl *sling.Sling) *sling.Sling {
+	return GenericQuery(q)
 }

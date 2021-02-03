@@ -10,6 +10,7 @@ type searchQuery struct {
 	Q    string `url:"q,omitempty"`
 	Size int    `url:"size,omitempty"`
 	Skip int64  `url:"skip,omitempty"`
+	Sort string `url:"sort,omitempty"`
 }
 
 // Opt defines custom options for requests
@@ -41,13 +42,24 @@ func Query(q interface{}) func(s *sling.Sling) *sling.Sling {
 }
 
 // QueryParams adds a q (query) url param
-func QueryParams(q interface{}, size int, skip int64) func(s *sling.Sling) *sling.Sling {
+func QueryParams(q interface{}, size int, skip int64, sort ...interface{}) func(s *sling.Sling) *sling.Sling {
 	return func(s *sling.Sling) *sling.Sling {
+		query := ""
 		if q != nil {
 			b, err := json.Marshal(q)
 			if err == nil {
-				return s.QueryStruct(searchQuery{string(b), size, skip})
+				query = string(b)
 			}
+		}
+		if len(sort) > 0 {
+			b, err := json.Marshal(sort[0])
+			if err == nil {
+				return s.QueryStruct(searchQuery{query, size, skip, string(b)})
+			}
+		}
+
+		if len(query) > 0 {
+			return s.QueryStruct(searchQuery{Q: query, Size: size, Skip: skip})
 		}
 		return s.QueryStruct(searchQuery{Size: size, Skip: skip})
 	}
